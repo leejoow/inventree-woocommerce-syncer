@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inventree-woocommerce-sync"
+version = "0.1.0"
+description = "Trigger WooCommerce order synchronization when an InvenTree sales order ships."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "InvenTree WooCommerce Sync contributors" },
+]
+dependencies = []
+
+[project.entry-points.inventree_plugins]
+WooCommerceOrderSyncPlugin = "inventree_woocommerce_sync.core:WooCommerceOrderSyncPlugin"
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["inventree_woocommerce_sync*"]
