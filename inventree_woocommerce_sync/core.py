@@ -242,6 +242,24 @@ class WooCommerceOrderSyncPlugin(
 
     def get_ui_primary_actions(self, request, context, **kwargs):
         """Add a manual import action to sales order pages."""
+
+        return [
+            {
+                "title": "Open Google",       # Tooltip text
+                "icon": "fas fa-external-link-alt",  # FontAwesome icon
+                "url": "https://www.google.com",     # Link target
+                "color": "success",           # Bootstrap color (success, danger, etc.)
+                "new_tab": True,               # Open in new tab
+            },
+            {
+                "title": "Run Custom JS",
+                "icon": "fas fa-play",
+                "javascript": "alert('Hello from plugin!');",
+                "color": "primary",
+            }
+        ]
+
+
         if (context or {}).get("target_model") != "salesorder":
             return []
 
