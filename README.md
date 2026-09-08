@@ -17,6 +17,7 @@ The WooCommerce connection is configured through the plugin settings:
 - `WOOCOMMERCE_URL`: host and API path without `https://`, for example `shop.example.com/wp-json/wc/v3`
 - `WOOCOMMERCE_CONSUMER_KEY`: WooCommerce REST API consumer key (`ck_...`)
 - `WOOCOMMERCE_CONSUMER_SECRET`: WooCommerce REST API consumer secret (`cs_...`)
+- `WOOCOMMERCE_IMPORT_INTERVAL_MINUTES`: interval for the open-order import stub; defaults to `60`
 
 Both credentials are stored as protected settings. The plugin logs an error and skips the API call when the sales order reference does not match `SO-<number>`.
 
@@ -46,3 +47,9 @@ docker compose restart
 ```
 
 After installation, restart both the InvenTree web server and background worker, then enable **WooCommerce Order Sync** in the Admin Center. Complete a shipment and inspect the worker log at debug level.
+
+## Open-order import framework
+
+The plugin provides the framework for importing open WooCommerce orders. Enable **Schedule Integration** in InvenTree to activate the worker schedule. The worker checks the configured interval once per minute and calls `load_open_woocommerce_orders(trigger="schedule")` when the interval is due.
+
+On sales-order pages, the **Import WooCommerce orders** primary action calls the same method with `trigger="manual"`. The method currently only logs that it was triggered; fetching and creating InvenTree sales orders will be implemented separately.

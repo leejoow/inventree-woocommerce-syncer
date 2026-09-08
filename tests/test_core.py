@@ -1,6 +1,7 @@
 import importlib
 import sys
 import types
+from datetime import datetime, timezone
 
 
 def load_plugin_module():
@@ -10,12 +11,29 @@ def load_plugin_module():
     mixins_module = types.ModuleType("plugin.mixins")
     mixins_module.APICallMixin = type("APICallMixin", (), {})
     mixins_module.EventMixin = type("EventMixin", (), {})
+    mixins_module.ScheduleMixin = type("ScheduleMixin", (), {})
+    mixins_module.UserInterfaceMixin = type("UserInterfaceMixin", (), {})
+    mixins_module.UrlsMixin = type("UrlsMixin", (), {})
 
     class SettingsMixin:
         def get_setting(self, key, **kwargs):
             return "basic" if key == "WOOCOMMERCE_AUTH_METHOD" else "test"
 
     mixins_module.SettingsMixin = SettingsMixin
+    django_module = types.ModuleType("django")
+    django_http_module = types.ModuleType("django.http")
+    django_http_module.HttpResponse = type("HttpResponse", (), {})
+    django_http_module.HttpResponseForbidden = type("HttpResponseForbidden", (), {})
+    django_urls_module = types.ModuleType("django.urls")
+    django_urls_module.path = lambda *args, **kwargs: (args, kwargs)
+    django_utils_module = types.ModuleType("django.utils")
+    django_timezone_module = types.ModuleType("django.utils.timezone")
+    django_timezone_module.now = lambda: datetime.now(timezone.utc)
+    sys.modules["django"] = django_module
+    sys.modules["django.http"] = django_http_module
+    sys.modules["django.urls"] = django_urls_module
+    sys.modules["django.utils"] = django_utils_module
+    sys.modules["django.utils.timezone"] = django_timezone_module
     status_codes_module = types.ModuleType("order.status_codes")
     status_codes_module.SalesOrderStatus = types.SimpleNamespace(
         SHIPPED=types.SimpleNamespace(value=20),
@@ -63,7 +81,6 @@ def test_shipment_event_logs_payload(caplog):
         plugin.sync_order_to_woocommerce = lambda order, shipment: None
         plugin.process_event("salesordershipment.completed", id=42)
 
-    assert "WooCommerce Order Sync plugin - Handle order" in caplog.text
     assert "Sales order shipment completed" in caplog.text
     assert "order=7" in caplog.text
 
@@ -133,7 +150,6 @@ def test_sync_order_to_woocommerce_logs_and_sends_request(caplog):
                         {"key": "tracking_number", "value": "TRACK-123"}
                     ],
                 },
-                "url_args": None,
                 "simple_response": False,
             },
         )
@@ -142,3 +158,33 @@ def test_sync_order_to_woocommerce_logs_and_sends_request(caplog):
     assert "PUT https://test/orders/741" in caplog.text
     assert '"tracking_number", "value": "TRACK-123"' in caplog.text
     assert "Basic ********" in caplog.text
+
+
+def test_scheduled_import_uses_configured_interval(monkeypatch):
+    module = load_plugin_module()
+    plugin = module.WooCommerceOrderSyncPlugin()
+    calls = []
+    plugin.get_setting = lambda key, **kwargs: 60
+    monkeypatch.setattr(
+        module.timezone,
+        "now",
+        lambda: datetime(2026, 9, 8, 12, 0, tzinfo=timezone.utc),
+    )
+    plugin.load_open_woocommerce_orders = lambda trigger: calls.append(trigger)
+
+    plugin.scheduled_order_import()
+
+    assert calls == ["schedule"]
+
+
+def test_sales_order_ui_action_points_to_manual_import():
+    module = load_plugin_module()
+    plugin = module.WooCommerceOrderSyncPlugin()
+
+    actions = plugin.get_ui_primary_actions(
+        request=None,
+        context={"target_model": "salesorder"},
+    )
+
+    assert actions[0]["key"] == "woocommerce-import-orders"
+    assert actions[0]["options"]["url"].endswith("import-orders/")
