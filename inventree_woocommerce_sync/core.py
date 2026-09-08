@@ -39,7 +39,7 @@ class WooCommerceOrderSyncPlugin(
     SLUG = "woocommerce-order-sync"
     TITLE = "WooCommerce Order Sync"
     DESCRIPTION = "Triggers WooCommerce synchronization for shipped sales orders."
-    VERSION = "0.1.3"
+    VERSION = "0.1.4"
     AUTHOR = "Leo Schelvis"
     LICENSE = "MIT"
 
@@ -242,6 +242,8 @@ class WooCommerceOrderSyncPlugin(
 
     def get_ui_primary_actions(self, request, context, **kwargs):
         """Add a manual import action to sales order pages."""
+
+        logger.warning("Start of UI primary actions")
 
         return [
             {
