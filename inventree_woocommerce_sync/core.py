@@ -17,7 +17,7 @@ from plugin.mixins import (
     ScheduleMixin,
     SettingsMixin,
     UserInterfaceMixin,
-    UrlsMixin,
+    ActionMixin,
 )
 
 
@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 
 class WooCommerceOrderSyncPlugin(
     APICallMixin,
+    ActionMixin,
     ScheduleMixin,
     SettingsMixin,
     EventMixin,
     UserInterfaceMixin,
-    UrlsMixin,
     InvenTreePlugin,
 ):
     """Prepare a WooCommerce update when an InvenTree sales order ships."""
@@ -39,7 +39,7 @@ class WooCommerceOrderSyncPlugin(
     SLUG = "woocommerce-order-sync"
     TITLE = "WooCommerce Order Sync"
     DESCRIPTION = "Triggers WooCommerce synchronization for shipped sales orders."
-    VERSION = "0.1.4"
+    VERSION = "0.2.0"
     AUTHOR = "Leo Schelvis"
     LICENSE = "MIT"
 
@@ -66,6 +66,11 @@ class WooCommerceOrderSyncPlugin(
             "default": 60,
             "validator": int,
         },
+        "WOOCOMMERCE_IMPORT_STATUS": {
+            "name": "WooCommerce order status to import",
+            "description": "Orders with this status are imported",
+            "default": "processing",
+        },
     }
 
     SCHEDULED_TASKS = {
@@ -80,11 +85,9 @@ class WooCommerceOrderSyncPlugin(
     API_TOKEN_SETTING = "WOOCOMMERCE_CONSUMER_KEY"
     ORDER_REFERENCE_PATTERN = re.compile(r"^SO-(\d+)$", re.IGNORECASE)
 
-    SHIPMENT_COMPLETED_EVENT = "salesordershipment.completed"
+    ACTION_NAME = "woocommerce-sync-orders"
 
-    def setup_urls(self):
-        """Register the manual order-import endpoint used by the UI button."""
-        return [path("import-orders/", self.manual_order_import, name="import-orders")]
+    SHIPMENT_COMPLETED_EVENT = "salesordershipment.completed"
 
     def __init__(self):
         """Initialize the plugin and report that it is ready."""
@@ -132,21 +135,32 @@ class WooCommerceOrderSyncPlugin(
 
         self.load_open_woocommerce_orders(trigger="schedule")
 
-    def manual_order_import(self, request):
-        """Trigger the import stub from the sales-order page action."""
-        if not request.user.is_staff:
-            return HttpResponseForbidden("Staff access required")
+    def perform_action(self, user=None, data=None):
+        """Trigger a manual WooCommerce order import."""
+        if user is None or not user.is_staff:
+            raise PermissionError("Staff access required")
 
         self.load_open_woocommerce_orders(trigger="manual")
-        return HttpResponse("WooCommerce order import started")
+
+    def get_info(self, user=None, data=None):
+        """Return information about the WooCommerce sync action."""
+        return {
+            "message": "WooCommerce order import",
+        }
+
+    def get_result(self, user=None, data=None):
+        """Return the result of the WooCommerce sync action."""
+        return {
+            "success": True,
+        }
 
     def load_open_woocommerce_orders(self, trigger):
-        """Placeholder for loading and creating open WooCommerce orders."""
-        logger.warning(
-            "WooCommerce open-order import triggered; trigger=%s; "
-            "implementation pending",
-            trigger,
-        )
+        """Import open WooCommerce orders as InvenTree sales orders."""
+        from .importer import WooCommerceOrderImporter
+
+        result = WooCommerceOrderImporter(self).run(trigger=trigger)
+        logger.warning("WooCommerce import (%s) result: %s", trigger, result)
+        return result
 
     def handle_shipped_order(self, *args, **kwargs):
         """Mark the order as shipped and synchronize it with WooCommerce."""
@@ -243,36 +257,15 @@ class WooCommerceOrderSyncPlugin(
     def get_ui_primary_actions(self, request, context, **kwargs):
         """Add a manual import action to sales order pages."""
 
-        logger.warning("Start of UI primary actions")
-
-        return [
-            {
-                "title": "Open Google",       # Tooltip text
-                "icon": "fas fa-external-link-alt",  # FontAwesome icon
-                "url": "https://www.google.com",     # Link target
-                "color": "success",           # Bootstrap color (success, danger, etc.)
-                "new_tab": True,               # Open in new tab
-            },
-            {
-                "title": "Run Custom JS",
-                "icon": "fas fa-play",
-                "javascript": "alert('Hello from plugin!');",
-                "color": "primary",
-            }
-        ]
-
-
-        if (context or {}).get("target_model") != "salesorder":
+        location = context.get("location", "")
+        if location != "/sales/index/salesorders":
             return []
 
         return [
             {
-                "key": "woocommerce-import-orders",
-                "title": "Import WooCommerce orders",
-                "description": "Start the open-order import.",
-                "icon": "ti:refresh:outline",
-                "options": {
-                    "url": "/plugin/woocommerce-order-sync/import-orders/",
-                },
+                "key": "sync-order",
+                "title": "Sync WooCommerce orders",
+                "icon": "mdi:database-import-outline",
+                "options": {'url': '/plugin/woocommerce-order-sync/import-orders/', 'color': 'green'},
             }
         ]
