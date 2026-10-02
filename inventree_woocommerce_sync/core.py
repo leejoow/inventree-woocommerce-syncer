@@ -16,6 +16,7 @@ from plugin.mixins import (
     EventMixin,
     ScheduleMixin,
     SettingsMixin,
+    UrlsMixin,
     UserInterfaceMixin,
     ActionMixin,
 )
@@ -29,6 +30,7 @@ class WooCommerceOrderSyncPlugin(
     ActionMixin,
     ScheduleMixin,
     SettingsMixin,
+    UrlsMixin,
     EventMixin,
     UserInterfaceMixin,
     InvenTreePlugin,
@@ -254,6 +256,18 @@ class WooCommerceOrderSyncPlugin(
             json.dumps(payload, sort_keys=True),
         )
 
+    def setup_urls(self):
+        """Serve the UI script used by the primary action button."""
+        return [
+            path("import_orders.js", self.serve_import_script, name="import-orders-js"),
+        ]
+
+    def serve_import_script(self, request):
+        """Return the JavaScript module for the manual import button."""
+        from .ui_script import IMPORT_ORDERS_JS
+
+        return HttpResponse(IMPORT_ORDERS_JS, content_type="text/javascript")
+
     def get_ui_primary_actions(self, request, context, **kwargs):
         """Add a manual import action to sales order pages."""
 
@@ -266,6 +280,7 @@ class WooCommerceOrderSyncPlugin(
                 "key": "sync-order",
                 "title": "Sync WooCommerce orders",
                 "icon": "mdi:database-import-outline",
-                "options": {'url': '/plugin/woocommerce-order-sync/import-orders/', 'color': 'green'},
+                "source": f"/plugin/{self.SLUG}/import_orders.js:importOrders",
+                "options": {"color": "green"},
             }
         ]
