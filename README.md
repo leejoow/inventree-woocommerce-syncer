@@ -37,7 +37,7 @@ Install this package into the InvenTree container, for example by adding the rep
 To copy the current plugin files from the project directory to the InvenTree host, run this command in PowerShell:
 
 ```powershell
-scp -r . <user>@inventree.local:~/inventree/data/plugins
+scp -r . root@inventree.local:~/inventree/data/plugins/inventree-woocommerce-sync
 ```
 
 Then restart the worker and web container so InvenTree reloads the plugin:
@@ -50,6 +50,23 @@ After installation, restart both the InvenTree web server and background worker,
 
 ## Open-order import framework
 
-The plugin provides the framework for importing open WooCommerce orders. Enable **Schedule Integration** in InvenTree to activate the worker schedule. The worker checks the configured interval once per minute and calls `load_open_woocommerce_orders(trigger="schedule")` when the interval is due.
+The plugin imports open WooCommerce orders. Enable **Schedule Integration** in InvenTree to activate the worker schedule. The worker checks the configured interval once per minute and calls `load_open_woocommerce_orders(trigger="schedule")` when the interval is due.
 
-On sales-order pages, the **Import WooCommerce orders** primary action calls the same method with `trigger="manual"`. The method currently only logs that it was triggered; fetching and creating InvenTree sales orders will be implemented separately.
+On sales-order pages, the **Import WooCommerce orders** primary action calls the same method with `trigger="manual"`.
+
+## WooCommerce line-item mapping
+
+The order importer inspects every WooCommerce order line. Product rules are stored in [`inventree_woocommerce_sync/line_item_mapping.json`](./inventree_woocommerce_sync/line_item_mapping.json), so new SKU and metadata combinations can be added there without changing Python code.
+
+- On first use, the plugin copies the packaged defaults to `/home/inventree/data/plugins/inventree-woocommerce-sync/line_item_mapping.json` if the file does not exist. It never overwrites an existing data-folder configuration.
+- The file is read again for each imported WooCommerce order. Edit the file in the mounted InvenTree data volume; changes apply to the next order without restarting InvenTree.
+- To use a different file location, set `WOOCOMMERCE_LINE_ITEM_MAPPING_FILE` in the server and worker containers to the same path.
+- `products` maps a WooCommerce SKU to its ordered rules.
+- A rule can match metadata with `when`, using `equals`, `in`, `not`, `all`, or `any`.
+- Each `add` entry contains an InvenTree internal part number (`sku`/IPN), a quantity per ordered unit, and optionally `price_from_order_line: true`.
+- Quantities can use `metadata_int`, `variable`, `add`, `subtract`, and `if` expressions. Variables are defined per product in `variables`.
+- Replace example SKU values with the exact IPNs configured on your InvenTree parts.
+
+For example, a line with quantity 2 and metadata `Temperatuursensoren=2` adds 4 sensors. Repeated mapped parts with the same sale price and notes are combined into one InvenTree order line. Product SKUs, metadata conditions, line-item SKUs, and relay-module quantity formulas are all configured in JSON; Python only evaluates the generic rule and arithmetic syntax.
+
+See [LINE_ITEM_MAPPING.md](./LINE_ITEM_MAPPING.md) for the full JSON format, supported conditions, quantity expressions, and configuration examples.

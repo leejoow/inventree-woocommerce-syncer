@@ -1,13 +1,14 @@
 """Import open WooCommerce orders into InvenTree sales orders using the ORM."""
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from django.core.cache import cache
 from django.db import transaction
 
 from .mapping import (
     SHIPPING_EXTRA_LINE_DESCRIPTION,
+    MetadataWarning,
     build_line_items,
     extract_shipping_total,
     normalize_text,
@@ -122,24 +123,36 @@ class WooCommerceOrderImporter:
             logger.warning("Order #%s is missing customer info, skipping", number)
             return "failed"
 
-        with transaction.atomic():
-            customer, address = self.find_or_create_customer(
-                email, name, street, zipcode, city, country
-            )
-
-            order = existing
-            if order is None:
-                order = SalesOrder.objects.create(
-                    reference=reference,
-                    customer=customer,
-                    address=address,
+        metadata_warnings: List[MetadataWarning] = []
+        try:
+            with transaction.atomic():
+                customer, address = self.find_or_create_customer(
+                    email, name, street, zipcode, city, country
                 )
-                logger.warning("Created sales order %s", reference)
 
-            self.add_shipping_line(order, woo_order)
-            self.add_part_lines(order, woo_order)
+                order = existing
+                if order is None:
+                    order = SalesOrder.objects.create(
+                        reference=reference,
+                        customer=customer,
+                        address=address,
+                    )
+                    logger.warning("Created sales order %s", reference)
 
-            order.issue_order()
+                self.add_shipping_line(order, woo_order)
+                self.add_part_lines(order, woo_order, metadata_warnings)
+
+                order.issue_order()
+        finally:
+            if metadata_warnings:
+                try:
+                    from .notifications import notify_metadata_warnings
+
+                    notify_metadata_warnings(reference, metadata_warnings)
+                except Exception:
+                    logger.exception(
+                        "Could not send metadata notifications for order %s", reference
+                    )
 
         self.allocate_stock(order)
         logger.warning("Successfully processed order #%s", number)
@@ -206,63 +219,137 @@ class WooCommerceOrderImporter:
             logger.warning("No valid shipping total for order %s", order.reference)
             return
 
-        if SalesOrderExtraLine.objects.filter(
-            order=order, description__iexact=SHIPPING_EXTRA_LINE_DESCRIPTION
-        ).exists():
-            return
+        try:
+            if SalesOrderExtraLine.objects.filter(
+                order=order, description__iexact=SHIPPING_EXTRA_LINE_DESCRIPTION
+            ).exists():
+                return
 
-        SalesOrderExtraLine.objects.create(
-            order=order,
-            description=SHIPPING_EXTRA_LINE_DESCRIPTION,
-            price=shipping_total,
-            quantity=1,
-        )
+            SalesOrderExtraLine.objects.create(
+                order=order,
+                description=SHIPPING_EXTRA_LINE_DESCRIPTION,
+                price=shipping_total,
+                quantity=1,
+            )
+        except Exception:
+            logger.warning(
+                "Could not add extra line '%s' to order %s (quantity=1, price=%s)",
+                SHIPPING_EXTRA_LINE_DESCRIPTION,
+                order.reference,
+                shipping_total,
+                exc_info=True,
+            )
+            raise
 
-    def add_part_lines(self, order, woo_order: Dict) -> None:
+    def add_part_lines(
+        self,
+        order,
+        woo_order: Dict,
+        metadata_warnings: Optional[List[MetadataWarning]] = None,
+    ) -> None:
         """Add the mapped part lines, skipping parts already on the order."""
         from order.models import SalesOrderLineItem
         from part.models import Part
 
-        line_items = build_line_items(woo_order.get("line_items", []))
+        if metadata_warnings is None:
+            line_items = build_line_items(woo_order.get("line_items", []))
+        else:
+            line_items = build_line_items(
+                woo_order.get("line_items", []), metadata_warnings.append
+            )
         if not line_items:
             logger.warning("No supported line items for order %s", order.reference)
             return
 
-        existing_part_ids = set(
-            SalesOrderLineItem.objects.filter(order=order).values_list("part_id", flat=True)
-        )
+        try:
+            existing_part_ids = set(
+                SalesOrderLineItem.objects.filter(order=order).values_list("part_id", flat=True)
+            )
+        except Exception:
+            for item in line_items:
+                logger.warning(
+                    "Could not check existing lines for order %s, SKU '%s' (quantity=%s)",
+                    order.reference,
+                    item.get("part_sku", ""),
+                    item.get("quantity", 1),
+                    exc_info=True,
+                )
+            raise
+        pending_lines: Dict[Tuple[int, object, object], Dict] = {}
+        pending_skus: Dict[Tuple[int, object, object], set] = {}
 
         for item in line_items:
-            product_name = item.get("name", "")
-            matches = list(
-                Part.objects.filter(
-                    name__iexact=product_name, salable=True, active=True
-                ).values_list("pk", flat=True)[:2]
-            )
+            part_sku = item.get("part_sku", "")
+            quantity = item.get("quantity", 1)
+            try:
+                matches = list(
+                    Part.objects.filter(
+                        IPN__iexact=part_sku, salable=True, active=True
+                    ).values_list("pk", flat=True)[:2]
+                )
+            except Exception:
+                logger.warning(
+                    "Could not look up InvenTree SKU '%s' for order %s (quantity=%s)",
+                    part_sku,
+                    order.reference,
+                    quantity,
+                    exc_info=True,
+                )
+                raise
 
             if not matches:
-                logger.warning("Product '%s' not found in InvenTree, skipping line", product_name)
+                logger.warning(
+                    "InvenTree part with SKU '%s' not found for order %s "
+                    "(quantity=%s), skipping line",
+                    part_sku,
+                    order.reference,
+                    quantity,
+                )
                 continue
             if len(matches) > 1:
-                logger.warning("Multiple salable parts named '%s', skipping line", product_name)
+                logger.warning(
+                    "Multiple salable InvenTree parts with SKU '%s' for order %s "
+                    "(quantity=%s), skipping line",
+                    part_sku,
+                    order.reference,
+                    quantity,
+                )
                 continue
 
             part_id = matches[0]
             if part_id in existing_part_ids:
                 continue
 
-            data = {
-                "order": order,
-                "part_id": part_id,
-                "quantity": item.get("quantity", 1),
-            }
-            if item.get("notes"):
-                data["notes"] = item["notes"]
-            if item.get("sale_price") is not None:
-                data["sale_price"] = item["sale_price"]
+            sale_price = item.get("sale_price")
+            notes = item.get("notes")
+            key = (part_id, sale_price, notes)
+            if key not in pending_lines:
+                pending_lines[key] = {
+                    "order": order,
+                    "part_id": part_id,
+                    "quantity": 0,
+                }
+                pending_skus[key] = set()
+                if notes:
+                    pending_lines[key]["notes"] = notes
+                if sale_price is not None:
+                    pending_lines[key]["sale_price"] = sale_price
 
-            SalesOrderLineItem.objects.create(**data)
-            existing_part_ids.add(part_id)
+            pending_skus[key].add(part_sku)
+            pending_lines[key]["quantity"] += quantity
+
+        for key, data in pending_lines.items():
+            try:
+                SalesOrderLineItem.objects.create(**data)
+            except Exception:
+                logger.warning(
+                    "Could not add InvenTree SKU(s) %s to order %s (quantity=%s)",
+                    ", ".join(sorted(pending_skus[key])),
+                    order.reference,
+                    data["quantity"],
+                    exc_info=True,
+                )
+                raise
 
     # ------------------------------------------------------------------
     # Shipment and allocation
@@ -311,4 +398,3 @@ class WooCommerceOrderImporter:
                         order.reference,
                         exc,
                     )
-

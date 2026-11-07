@@ -18,10 +18,13 @@ dependencies = []
 WooCommerceOrderSyncPlugin = "inventree_woocommerce_sync.core:WooCommerceOrderSyncPlugin"
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "jsonschema>=4"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
 include = ["inventree_woocommerce_sync*"]
+
+[tool.setuptools.package-data]
+inventree_woocommerce_sync = ["line_item_mapping.json", "line_item_mapping.schema.json"]

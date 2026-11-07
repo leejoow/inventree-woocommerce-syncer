@@ -1,0 +1,243 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WooCommerce line-item mapping",
+  "description": "Maps WooCommerce product SKUs and metadata to InvenTree parts.",
+  "type": "object",
+  "required": ["products"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional schema location for editors; ignored by the importer."
+    },
+    "products": {
+      "type": "object",
+      "description": "Products keyed by WooCommerce SKU, compared case-insensitively.",
+      "propertyNames": {"$ref": "#/definitions/nonEmptyString"},
+      "additionalProperties": {"$ref": "#/definitions/product"}
+    }
+  },
+  "definitions": {
+    "nonEmptyString": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "product": {
+      "type": "object",
+      "required": ["rules"],
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/definitions/rule"}
+        },
+        "variables": {
+          "type": "object",
+          "description": "Integer values used by quantity expressions.",
+          "propertyNames": {"$ref": "#/definitions/nonEmptyString"},
+          "additionalProperties": {"type": "integer"}
+        },
+        "required_metadata": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/nonEmptyString"},
+          "uniqueItems": true
+        },
+        "allowed_metadata_values": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/definitions/nonEmptyString"},
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "required": ["add"],
+      "additionalProperties": false,
+      "properties": {
+        "when": {"$ref": "#/definitions/condition"},
+        "add": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/definitions/part"}
+        }
+      }
+    },
+    "part": {
+      "type": "object",
+      "required": ["sku"],
+      "additionalProperties": false,
+      "properties": {
+        "sku": {
+          "allOf": [{"$ref": "#/definitions/nonEmptyString"}],
+          "description": "InvenTree part IPN, not the WooCommerce SKU."
+        },
+        "quantity": {
+          "allOf": [{"$ref": "#/definitions/quantity"}],
+          "description": "Per ordered unit; results of zero or less are skipped."
+        },
+        "price_from_order_line": {"type": "boolean"},
+        "notes": {
+          "oneOf": [
+            {"type": "string"},
+            {
+              "type": "object",
+              "required": ["metadata"],
+              "additionalProperties": false,
+              "properties": {
+                "metadata": {"$ref": "#/definitions/nonEmptyString"}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["metadata", "equals"],
+          "additionalProperties": false,
+          "properties": {
+            "metadata": {"$ref": "#/definitions/nonEmptyString"},
+            "equals": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["metadata", "in"],
+          "additionalProperties": false,
+          "properties": {
+            "metadata": {"$ref": "#/definitions/nonEmptyString"},
+            "in": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string"}
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["metadata_int", "greater_than"],
+          "additionalProperties": false,
+          "properties": {
+            "metadata_int": {"$ref": "#/definitions/nonEmptyString"},
+            "greater_than": {"type": "number"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["all"],
+          "additionalProperties": false,
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/definitions/condition"}
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["any"],
+          "additionalProperties": false,
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/definitions/condition"}
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["not"],
+          "additionalProperties": false,
+          "properties": {
+            "not": {"$ref": "#/definitions/condition"}
+          }
+        }
+      ]
+    },
+    "quantity": {
+      "oneOf": [
+        {"type": "integer"},
+        {
+          "type": "object",
+          "required": ["metadata_int"],
+          "additionalProperties": false,
+          "properties": {
+            "metadata_int": {
+              "oneOf": [
+                {"$ref": "#/definitions/nonEmptyString"},
+                {
+                  "type": "object",
+                  "required": ["key"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "key": {"$ref": "#/definitions/nonEmptyString"},
+                    "default": {"type": "integer"}
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["variable"],
+          "additionalProperties": false,
+          "properties": {
+            "variable": {"$ref": "#/definitions/nonEmptyString"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["add"],
+          "additionalProperties": false,
+          "properties": {
+            "add": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/definitions/quantity"}
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["subtract"],
+          "additionalProperties": false,
+          "properties": {
+            "subtract": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {"$ref": "#/definitions/quantity"}
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["if"],
+          "additionalProperties": false,
+          "properties": {
+            "if": {
+              "type": "object",
+              "required": ["condition", "then", "else"],
+              "additionalProperties": false,
+              "properties": {
+                "condition": {"$ref": "#/definitions/condition"},
+                "then": {"$ref": "#/definitions/quantity"},
+                "else": {"$ref": "#/definitions/quantity"}
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

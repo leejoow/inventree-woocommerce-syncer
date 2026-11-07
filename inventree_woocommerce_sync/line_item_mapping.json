@@ -1,0 +1,490 @@
+{
+  "products": {
+    "hpc-q": {
+      "required_metadata": [
+        "Tweakers editie"
+      ],
+      "allowed_metadata_values": {
+        "Tweakers editie": [
+          "Ja",
+          "Nee"
+        ],
+        "Bevestigingsbeugel": [
+          "Ja",
+          "Nee"
+        ],
+        "Extra temperatuursensor": [
+          "Nee",
+          "Ja",
+          "Ja-18",
+          "Ja-22",
+          "Ja-28"
+        ],
+        "USB C kabel (1 meter)": [
+          "Ja",
+          "Nee"
+        ]
+      },
+      "rules": [
+        {
+          "when": {"metadata": "Tweakers editie", "equals": "Ja"},
+          "add": [
+            {
+              "sku": "hpcq-t-1.3",
+              "quantity": 1,
+              "price_from_order_line": true
+            },
+            {
+              "sku": "dupont-20cm",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Tweakers editie", "equals": "Nee"},
+          "add": [
+            {
+              "sku": "hpcq-1.3",
+              "quantity": 1,
+              "price_from_order_line": true
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Bevestigingsbeugel", "equals": "Ja"},
+          "add": [
+            {
+              "sku": "print-hpcq-holder",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "USB C kabel (1 meter)", "equals": "Ja"},
+          "add": [
+            {
+              "sku": "usbc",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Extra temperatuursensor", "equals": "Nee"},
+          "add": [
+            {
+              "sku": "hpcq-connection-set-1",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Extra temperatuursensor", "in": ["Ja", "Ja-18", "Ja-22", "Ja-18"]},
+          "add": [
+            {
+              "sku": "temperature-sensor",
+              "quantity": 1
+            },
+            {
+              "sku": "hpcq-connection-set-2",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Extra temperatuursensor", "in": ["Ja-18", "Ja-22", "Ja-18"]},
+          "add": [
+            {
+              "sku": "thermalpaste",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Extra temperatuursensor", "equals": "Ja-18"},
+          "add": [
+            {
+              "sku": "print-holder-ds18b20-18",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Extra temperatuursensor", "equals": "Ja-22"},
+          "add": [
+            {
+              "sku": "print-holder-ds18b20-22",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Extra temperatuursensor", "equals": "Ja-28"},
+          "add": [
+            {
+              "sku": "print-holder-ds18b20-28",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "add": [
+            {"sku": "verzenddoos-a6", "quantity": 1}
+          ]
+        }
+      ]
+    },
+    "temperature-sensor": {
+      "rules": [
+        {
+          "add": [
+            {
+              "sku": "temperature-sensor",
+              "quantity": 1,
+              "price_from_order_line": true
+            }
+          ]
+        }
+      ]
+    },
+    "amber-control-module-4relay": {
+      "variables": {"relay_count": 4},
+      "rules": [
+        {
+          "add": [
+            {
+              "sku": "hpm-4relay",
+              "quantity": 1,
+              "price_from_order_line": true,
+              "notes": "Amber"
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Aansluitset", "equals": "Ja"},
+          "add": [{"sku": "amber-connection-set", "quantity": 1}]
+        },
+        {
+          "when": {"metadata": "Aansluitset", "equals": "Nee"},
+          "add": [{"sku": "gripzak-80x120", "quantity": 1}]
+        },
+        {
+          "when": {"metadata_int": "Temperatuursensoren", "greater_than": 0},
+          "add": [
+            {
+              "sku": "temperature-sensor",
+              "quantity": {
+                "metadata_int": {"key": "Temperatuursensoren", "default": 0}
+              }
+            }
+          ]
+        },
+        {
+          "add": [
+            {
+              "sku": "connector-screw-2pin",
+              "quantity": {
+                "if": {
+                  "condition": {
+                    "metadata": "Aansluitset",
+                    "equals": "Ja"
+                  },
+                  "then": {"variable": "relay_count"},
+                  "else": {
+                    "add": [{"variable": "relay_count"}, 1]
+                  }
+                }
+              }
+            },
+            {
+              "sku": "connector-screw-3pin",
+              "quantity": {
+                "subtract": [
+                  4,
+                  {
+                    "metadata_int": {
+                      "key": "Temperatuursensoren",
+                      "default": 0
+                    }
+                  }
+                ]
+              }
+            },
+            {"sku": "verzenddoos-a5", "quantity": 1}
+          ]
+        }
+      ]
+    },
+    "amber-control-module-2relay": {
+      "variables": {"relay_count": 2},
+      "rules": [
+        {
+          "add": [
+            {
+              "sku": "hpm-2relay",
+              "quantity": 1,
+              "price_from_order_line": true,
+              "notes": "Amber"
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Aansluitset", "equals": "Ja"},
+          "add": [{"sku": "amber-connection-set", "quantity": 1}]
+        },
+        {
+          "when": {"metadata": "Aansluitset", "equals": "Nee"},
+          "add": [{"sku": "gripzak-80x120", "quantity": 1}]
+        },
+        {
+          "when": {"metadata_int": "Temperatuursensoren", "greater_than": 0},
+          "add": [
+            {
+              "sku": "temperature-sensor",
+              "quantity": {
+                "metadata_int": {"key": "Temperatuursensoren", "default": 0}
+              }
+            }
+          ]
+        },
+        {
+          "add": [
+            {
+              "sku": "connector-screw-2pin",
+              "quantity": {
+                "if": {
+                  "condition": {
+                    "metadata": "Aansluitset",
+                    "equals": "Ja"
+                  },
+                  "then": {"variable": "relay_count"},
+                  "else": {
+                    "add": [{"variable": "relay_count"}, 1]
+                  }
+                }
+              }
+            },
+            {
+              "sku": "connector-screw-3pin",
+              "quantity": {
+                "subtract": [
+                  4,
+                  {
+                    "metadata_int": {
+                      "key": "Temperatuursensoren",
+                      "default": 0
+                    }
+                  }
+                ]
+              }
+            },
+            {"sku": "verzenddoos-a5", "quantity": 1}
+          ]
+        }
+      ]
+    },
+    "heatpump-listener-4relay": {
+      "variables": {"relay_count": 4},
+      "rules": [
+        {
+          "add": [
+            {
+              "sku": "heatpump_module_4relay",
+              "quantity": 1,
+              "price_from_order_line": true,
+              "notes": {"metadata": "softwareversie"}
+            }
+          ]
+        },
+        {
+          "when": {
+            "metadata": "Aansluitset",
+            "in": ["Ja", "Yes", "True", "1"]
+          },
+          "add": [{"sku": "amber_connection_set", "quantity": 1}]
+        },
+        {
+          "when": {
+            "not": {
+              "metadata": "Aansluitset",
+              "in": ["Ja", "Yes", "True", "1"]
+            }
+          },
+          "add": [{"sku": "gripzak_80x120", "quantity": 1}]
+        },
+        {
+          "when": {"metadata_int": "Temperatuursensoren", "greater_than": 0},
+          "add": [
+            {
+              "sku": "temperature-sensor_2m",
+              "quantity": {
+                "metadata_int": {"key": "Temperatuursensoren", "default": 0}
+              }
+            }
+          ]
+        },
+        {
+          "add": [
+            {
+              "sku": "connector_2pin",
+              "quantity": {
+                "if": {
+                  "condition": {
+                    "metadata": "Aansluitset",
+                    "in": ["Ja", "Yes", "True", "1"]
+                  },
+                  "then": {"variable": "relay_count"},
+                  "else": {
+                    "add": [{"variable": "relay_count"}, 1]
+                  }
+                }
+              }
+            },
+            {
+              "sku": "connector_3pin",
+              "quantity": {
+                "subtract": [
+                  4,
+                  {
+                    "metadata_int": {
+                      "key": "Temperatuursensoren",
+                      "default": 0
+                    }
+                  }
+                ]
+              }
+            },
+            {"sku": "verzenddoos_a5", "quantity": 1}
+          ]
+        }
+      ]
+    },
+    "heatpump-listener-2relay": {
+      "variables": {"relay_count": 2},
+      "rules": [
+        {
+          "add": [
+            {
+              "sku": "heatpump_module_2relay",
+              "quantity": 1,
+              "price_from_order_line": true,
+              "notes": {"metadata": "softwareversie"}
+            }
+          ]
+        },
+        {
+          "when": {
+            "metadata": "Aansluitset",
+            "in": ["Ja", "Yes", "True", "1"]
+          },
+          "add": [{"sku": "amber_connection_set", "quantity": 1}]
+        },
+        {
+          "when": {
+            "not": {
+              "metadata": "Aansluitset",
+              "in": ["Ja", "Yes", "True", "1"]
+            }
+          },
+          "add": [{"sku": "gripzak_80x120", "quantity": 1}]
+        },
+        {
+          "when": {"metadata_int": "Temperatuursensoren", "greater_than": 0},
+          "add": [
+            {
+              "sku": "temperature-sensor_2m",
+              "quantity": {
+                "metadata_int": {"key": "Temperatuursensoren", "default": 0}
+              }
+            }
+          ]
+        },
+        {
+          "add": [
+            {
+              "sku": "connector_2pin",
+              "quantity": {
+                "if": {
+                  "condition": {
+                    "metadata": "Aansluitset",
+                    "in": ["Ja", "Yes", "True", "1"]
+                  },
+                  "then": {"variable": "relay_count"},
+                  "else": {
+                    "add": [{"variable": "relay_count"}, 1]
+                  }
+                }
+              }
+            },
+            {
+              "sku": "connector_3pin",
+              "quantity": {
+                "subtract": [
+                  4,
+                  {
+                    "metadata_int": {
+                      "key": "Temperatuursensoren",
+                      "default": 0
+                    }
+                  }
+                ]
+              }
+            },
+            {"sku": "verzenddoos_a5", "quantity": 1}
+          ]
+        }
+      ]
+    },
+    "dallas-holder": {
+      "required_metadata": [
+        "Maat"
+      ],
+      "allowed_metadata_values": {
+        "Maat": [
+          "18mm",
+          "22mm",
+          "28mm"
+        ]
+      },
+      "rules": [
+        {
+          "when": {"metadata": "Maat", "equals": "18mm"},
+          "add": [
+            {
+              "sku": "print-holder-ds18b20-18",
+              "price_from_order_line": true,
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Maat", "equals": "22mm"},
+          "add": [
+            {
+              "sku": "print-holder-ds18b20-22",
+              "price_from_order_line": true,
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "when": {"metadata": "Maat", "equals": "28mm"},
+          "add": [
+            {
+              "sku": "print-holder-ds18b20-28",
+              "price_from_order_line": true,
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "add": [
+            {
+              "sku": "thermalpaste",
+              "quantity": 1
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
