@@ -32,7 +32,6 @@ class MetadataWarning(NamedTuple):
     key: str
     value: str
 
-
 def normalize_text(value: object) -> str:
     """Normalize text values for case-insensitive comparisons."""
     return str(value or '').strip().lower()

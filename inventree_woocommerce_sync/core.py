@@ -139,9 +139,6 @@ class WooCommerceOrderSyncPlugin(
 
     def perform_action(self, user=None, data=None):
         """Trigger a manual WooCommerce order import."""
-        if user is None or not user.is_staff:
-            raise PermissionError("Staff access required")
-
         self.load_open_woocommerce_orders(trigger="manual")
 
     def get_info(self, user=None, data=None):
